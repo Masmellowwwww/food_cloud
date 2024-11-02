@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Expiry Management System</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* CSS เดิมของคุณ */
+        /* Reset CSS */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        /* สไตล์สำหรับ body */
+        body {
+            font-family: Arial, sans-serif;
+            background-image: url('image/image.png');
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: rgba(228, 129, 63, 0.9);
+            padding: 30px;
+            border-radius: 20px;
+        }
+        /* ส่วนหัว */
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        /* สไตล์ฟอร์ม */
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+        form label {
+            display: block;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        form input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        form button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        form button:hover {
+            background-color: #218838;
+        }
+        /* สไตล์สำหรับส่วนแสดงผล */
+        h2 {
+            margin-top: 20px;
+            color: #333;
+        }
+        #food-list {
+            list-style-type: none;
+            margin-top: 15px;
+            width: 100%;
+            max-width: 400px;
+        }
+        #food-list li {
+            background-color: #fff;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            font-size: 16px;
+            color: #333;
+        }
+        /* ปุ่มแสดงรายการอาหาร */
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #ffee00;
+            border: none;
+            border-radius: 4px;
+            color: #404040;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #ffee00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Food Expiry Management</h1>
+        <form id="add-food-form">
+            <label for="name">Food Name:</label>
+            <input type="text" id="name" name="name" required>
+            <label for="expiry_date">Expiry Date:</label>
+            <input type="date" id="expiry_date" name="expiry_date" required>
+            <label for="quantity">Quantity:</label>
+            <input type="number" id="quantity" name="quantity" min="1" value="1">
+            <button type="submit">Add Food</button>
+        </form>
+
+        <h2>Foods List</h2>
+        <button onclick="fetchFoods()">Show All Foods</button>
+        <button onclick="fetchExpiringSoon()">Show Foods Expiring Soon</button>
+
+        <ul id="food-list"></ul>
+    </div>
+    
+    <script>
+        document.getElementById('add-food-form').addEventListener('submit', function(e) {
+            e.preventDefault(); // ป้องกันการรีเฟรชหน้า
+
+            // รับค่าจากฟอร์ม
+            const name = document.getElementById('name').value;
+            const expiry_date = document.getElementById('expiry_date').value;
+            const quantity = document.getElementById('quantity').value;
+
+            // ส่งข้อมูลแบบ AJAX โดยใช้ fetch
+            fetch('/addfood', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `name=${encodeURIComponent(name)}&expiry_date=${encodeURIComponent(expiry_date)}&quantity=${encodeURIComponent(quantity)}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                // ใช้ SweetAlert2 แทน alert ปกติ
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Food added successfully!',
+                    text: `You have added ${name} with ${quantity} item(s).`,
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+                document.getElementById('add-food-form').reset(); // รีเซ็ตฟอร์ม
+                fetchFoods(); // เรียกข้อมูลใหม่มาแสดง
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+
+        function fetchFoods() {
+            fetch('/foods')
+                .then(response => response.json())
+                .then(data => {
+                    const list = document.getElementById('food-list');
+                    list.innerHTML = '';
+                    data.forEach(food => {
+                        list.innerHTML += `<li>${food.name} - Expiry: ${food.expiry_date} - Quantity: ${food.quantity} - Days Remaining: ${food.days_remaining} day(s)</li>`;
+                    });
+                });
+        }
+
+        function fetchExpiringSoon() {
+            fetch('/foods/expiring-soon')
+                .then(response => response.json())
+                .then(data => {
+                    const list = document.getElementById('food-list');
+                    list.innerHTML = '';
+                    data.forEach(food => {
+                        list.innerHTML += `<li>${food.name} - Expiry: ${food.expiry_date} - Quantity: ${food.quantity} - Days Remaining: ${food.days_remaining} day(s)</li>`;
+                    });
+                });
+        }
+    </script>
+</body>
+</html>
