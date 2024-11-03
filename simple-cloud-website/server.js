@@ -1,28 +1,38 @@
-// server.js
-
 require('dotenv').config();
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const mysql = require('mysql2');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-// เชื่อมต่อกับฐานข้อมูล SQLite
-const db = new sqlite3.Database('./food_db.sqlite', (err) => {
-    if (err) {
-        console.error(err.message);
-    }
-    console.log('Connected to the SQLite database.');
+// เชื่อมต่อกับฐานข้อมูล MySQL โดยใช้ตัวแปรจาก .env
+const db = mysql.createConnection({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
 });
 
-// // สร้างตาราง foods ถ้ายังไม่มีในฐานข้อมูล
-// db.run(`CREATE TABLE IF NOT EXISTS foods (
-//     id INTEGER PRIMARY KEY AUTOINCREMENT,
-//     name TEXT NOT NULL,
-//     expiry_date TEXT NOT NULL,
-//     quantity INTEGER DEFAULT 1
-// )`);
+db.connect((err) => {
+    if (err) {
+        console.error('Database connection error:', err.message);
+    } else {
+        console.log('Connected to the MySQL database.');
+    }
+});
+
+// สร้างตาราง foods ถ้ายังไม่มีในฐานข้อมูล
+db.query(`CREATE TABLE IF NOT EXISTS foods (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    expiry_date DATE NOT NULL,
+    quantity INT DEFAULT 1
+)`, (err) => {
+    if (err) {
+        console.error('Table creation error:', err.message);
+    }
+});
 
 // ตั้งค่า body parser และโฟลเดอร์สำหรับแสดง HTML
 app.use(express.urlencoded({ extended: true }));
@@ -37,59 +47,64 @@ app.get('/', (req, res) => {
 app.post('/addfood', (req, res) => {
     const { name, expiry_date, quantity } = req.body;
     const query = `INSERT INTO foods (name, expiry_date, quantity) VALUES (?, ?, ?)`;
-    db.run(query, [name, expiry_date, quantity], function (err) {
+    db.query(query, [name, expiry_date, quantity], (err, result) => {
         if (err) {
-            return console.error(err.message);
+            console.error('Insert error:', err.message);
+            res.status(500).send('Database error');
+        } else {
+            res.send('Food added successfully');
         }
-        res.send('Food added successfully');
     });
 });
-
 
 // Route แสดงรายการอาหารทั้งหมดพร้อมกับวันที่เหลือ
 app.get('/foods', (req, res) => {
     const query = `
         SELECT id, name, expiry_date, quantity, 
-        ROUND(julianday(expiry_date) - julianday('now')) AS days_remaining
+        ROUND(DATEDIFF(expiry_date, CURDATE())) AS days_remaining
         FROM foods
         ORDER BY expiry_date
     `;
-    db.all(query, [], (err, rows) => {
+    db.query(query, (err, rows) => {
         if (err) {
-            throw err;
+            console.error('Query error:', err.message);
+            res.status(500).send('Database error');
+        } else {
+            res.json(rows);
         }
-        res.json(rows);
     });
 });
 
-
-// Route แสดงอาหารใกล้หมดอายุ (ภายใน 3 วัน) พร้อมแสดงจำนวนวันที่เหลือ
+// Route แสดงอาหารใกล้หมดอายุ (ภายใน 3 วัน)
 app.get('/foods/expiring-soon', (req, res) => {
     const query = `
         SELECT id, name, expiry_date, quantity,
-        ROUND(julianday(expiry_date) - julianday('now')) AS days_remaining
+        ROUND(DATEDIFF(expiry_date, CURDATE())) AS days_remaining
         FROM foods
-        WHERE julianday(expiry_date) - julianday('now') <= 3
+        WHERE DATEDIFF(expiry_date, CURDATE()) <= 3
         ORDER BY expiry_date
     `;
-    db.all(query, [], (err, rows) => {
+    db.query(query, (err, rows) => {
         if (err) {
-            throw err;
+            console.error('Query error:', err.message);
+            res.status(500).send('Database error');
+        } else {
+            res.json(rows);
         }
-        res.json(rows);
     });
 });
-
 
 // Route ลบรายการอาหาร
 app.post('/deletefood', (req, res) => {
     const { id } = req.body;
     const query = `DELETE FROM foods WHERE id = ?`;
-    db.run(query, [id], function (err) {
+    db.query(query, [id], (err, result) => {
         if (err) {
-            return console.error(err.message);
+            console.error('Delete error:', err.message);
+            res.status(500).send('Database error');
+        } else {
+            res.send('Food deleted successfully');
         }
-        res.send('Food deleted successfully');
     });
 });
 
