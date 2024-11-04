@@ -14,6 +14,7 @@ const db = mysql.createConnection({
     database: 'foodwisedb'
 });
 
+
 db.connect((err) => {
     if (err) {
         console.error('Database connection error:', err);
